@@ -23,6 +23,7 @@ import os
 from mpi4py import MPI
 
 import logging
+import time
 
 from docopt import docopt
 args = docopt(__doc__)
@@ -72,36 +73,37 @@ y_basis = de.Fourier('y', ny, interval=(0, 2*np.pi))
 z_basis = de.Fourier('z', ny, interval=(0, 2*np.pi))
 domain = de.Domain([x_basis, y_basis, z_basis], grid_dtype='float')
 
-prob = domain.IVP(domain, variables=['u','v','w','ϖ'])
+problem = de.IVP(domain, variables=['u','v','w','p'])
 problem.parameters['R'] = 1/Re
 problem.parameters['kx'] = kx
 problem.parameters['ky'] = ky
 problem.parameters['kz'] = kz
 problem.substitutions['Lap(A)'] = 'dx(dx(A))+dy(dy(A))+dz(dz(A))'
-problem.substitutions['u.grad(A)'] = 'u*dx(A) + v*dy(A) + w*dz(A)'
+problem.substitutions['u_grad(A)'] = 'u*dx(A) + v*dy(A) + w*dz(A)'
 problem.substitutions['fx'] = 'cos(kx*x)'
 problem.substitutions['fy'] = 'cos(ky*y)'
 problem.substitutions['fz'] = 'cos(kz*z)'
-problem.add_equation('dt(u) + dx(ϖ) - R*Lap(u) = -u.grad(u) + fx')
-problem.add_equation('dt(v) + dy(ϖ) - R*Lap(v) = -u.grad(v) + fy')
-problem.add_equation('dt(w) + dz(ϖ) - R*Lap(w) = -u.grad(w) + fz')
-problem.add_equation('dx(u) + dy(v) + dz(w) = 0')
+problem.add_equation('dt(u) + dx(p) - R*Lap(u) = -u_grad(u) + fx')
+problem.add_equation('dt(v) + dy(p) - R*Lap(v) = -u_grad(v) + fy')
+problem.add_equation('dt(w) + dz(p) - R*Lap(w) = -u_grad(w) + fz')
+problem.add_equation('dx(u) + dy(v) + dz(w) = 0', condition="(nx != 0) or (ny != 0) or (nz != 0)")
+problem.add_equation('p = 0', condition="(nx == 0) and (ny == 0) and (nz == 0)")
 
 # Build solver
 solver = problem.build_solver(de.timesteppers.SBDF4)
 logger.info('Solver built')
 
 # Integration parameters
-solver.stop_sim_time = 10
+solver.stop_sim_time = Re
 
-dt = 0.2*1/n
+dt = 1
 
 # Analysis
-snapshots = solver.evaluator.add_file_handler('{:}/snapshots'.format(data_dir), sim_dt=0.1, max_writes=10)
+snapshots = solver.evaluator.add_file_handler('{:}/snapshots'.format(data_dir), sim_dt=1, max_writes=10)
 snapshots.add_system(solver.state)
-snapshots.add_task(u, name='u_hat', layout='c')
-snapshots.add_task(v, name='v_hat', layout='c')
-snapshots.add_task(w, name='w_hat', layout='c')
+snapshots.add_task('u', name='u_hat', layout='c')
+snapshots.add_task('v', name='v_hat', layout='c')
+snapshots.add_task('w', name='w_hat', layout='c')
 
 # CFL
 CFL = flow_tools.CFL(solver, initial_dt=dt, cadence=10, safety=0.4,
@@ -120,7 +122,7 @@ try:
         dt = CFL.compute_dt()
         dt = solver.step(dt)
         if (solver.iteration-1) % 1 == 0:
-            logger.info('Iteration: {:d}, Time: {:f}, dt: {:f}, Re = {:g}, {:g}'.format(solver.iteration, solver.sim_time, dt, flow.max('Re'), flow.volume_average('Re'))
+            logger.info('Iteration: {:d}, Time: {:f}, dt: {:f}, Re = {:g}, {:g}'.format(solver.iteration, solver.sim_time, dt, flow.max('Re'), flow.volume_average('Re')))
 except:
     logger.error('Exception raised, triggering end of main loop.')
     raise
@@ -133,4 +135,4 @@ finally:
     logger.info('Sim end time: {:f}'.format(solver.sim_time))
     logger.info('Run time: {:f} sec'.format(main_loop_time))
     logger.info('Run time: {:f} cpu-hr'.format(n_cpu*main_loop_time/(3600)))
-    logger.info('mode-iter/cpu-sec: {:f} (main loop only)'.format(n_iter_loop*n**3/(main_loop_time*n_cpu))
+    logger.info('mode-iter/cpu-sec: {:f} (main loop only)'.format(n_iter_loop*n**3/(main_loop_time*n_cpu)))
