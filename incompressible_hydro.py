@@ -107,6 +107,48 @@ problem.add_equation('p = 0', condition="(nx == 0) and (ny == 0) and (nz == 0)")
 solver = problem.build_solver(de.timesteppers.SBDF4)
 logger.info('Solver built')
 
+
+# Initial conditions
+def global_noise(domain, seed=42, filter_scale=0.5, scale=None, **kwargs):
+    # Random perturbations, initialized globally for same results in parallel
+    gshape = domain.dist.grid_layout.global_shape(scales=domain.dealias)
+    slices = domain.dist.grid_layout.slices(scales=domain.dealias)
+    rand = np.random.RandomState(seed=seed)
+    noise = rand.standard_normal(gshape)[slices]
+
+    # filter in k-space
+    noise_field = domain.new_field()
+    noise_field.set_scales(domain.dealias, keep_data=False)
+    noise_field['g'] = noise
+    noise_field.set_scales(filter_scale, keep_data=True)
+    noise_field['c']
+    noise_field['g']
+    if scale is not None:
+        noise_field.set_scales(scale, keep_data=True)
+    else:
+        noise_field.set_scales(domain.dealias, keep_data=True)
+
+    return noise_field
+
+u = solver.state['u']
+v = solver.state['v']
+w = solver.state['w']
+Ax = domain.new_field()
+Ay = domain.new_field()
+Az = domain.new_field()
+noise_x = global_noise(domain, scale=1, filter_scale=0.5, seed=42)
+noise_y = global_noise(domain, scale=1, filter_scale=0.5, seed=43)
+noise_z = global_noise(domain, scale=1, filter_scale=0.5, seed=44)
+amp = 1/Re
+# for noise perturbations that respect div.u=0, populate A with noise and take u=curl(A)
+Ax['g'] = amp*noise_x['g']
+Ay['g'] = amp*noise_y['g']
+Az['g'] = amp*noise_z['g']
+u['g'] = Az.differentiate('y')['g'] - Ay.differentiate('z')['g']
+v['g'] = Ax.differentiate('z')['g'] - Az.differentiate('x')['g']
+w['g'] = Ay.differentiate('x')['g'] - Ax.differentiate('y')['g']
+
+
 # Integration parameters
 solver.stop_sim_time = np.inf #Re
 solver.stop_wall_time = np.inf
