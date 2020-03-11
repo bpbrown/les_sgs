@@ -10,18 +10,60 @@ Options:
     --k=<k>           k-value to stir domain at [default: 10]
     --Reynolds=<Re>   Reynolds number of the turbulence [default: 1000]
 
+    --mesh=<mesh>     Processor mesh, takes format n1,n2 for a 2-d mesh decomposition of n1xn2 cores
+
 """
 
 import numpy as np
 import dedalus.public as de
 from dedalus.extras import flow_tools
 
+import sys
+import os
+from mpi4py import MPI
+
 import logging
-logger = logging.getLogger(__name__)
+
+from docopt import docopt
+args = docopt(__doc__)
+
+# Find MPI rank
+comm = MPI.COMM_WORLD
+rank = comm.rank
+size = comm.size
 
 nx = ny = nz = n = int(args['--n'])
 kx = ky = kz = k = float(args['--k'])
 Re = float(args['--Reynolds'])
+
+# save data in directory named after script
+data_dir = sys.argv[0].split('.py')[0]
+data_dir += '_Re{:}_n{:}'.format(args['--Reynolds'], args['--n'])
+
+from dedalus.tools.config import config
+
+config['logging']['filename'] = os.path.join(data_dir,'logs/dedalus_log')
+config['logging']['file_level'] = 'DEBUG'
+
+if rank == 0:
+    if not os.path.exists('{:s}/'.format(data_dir)):
+        os.makedirs('{:s}/'.format(data_dir))
+    logdir = os.path.join(data_dir,'logs')
+    if not os.path.exists(logdir):
+        os.mkdir(logdir)
+logger = logging.getLogger(__name__)
+logger.info("saving run in: {}".format(data_dir))
+
+
+mesh = args['--mesh']
+if mesh is not None:
+    mesh = mesh.split(',')
+    mesh = [int(mesh[0]), int(mesh[1])]
+else:
+    log2 = np.log2(size)
+    if log2 == int(log2):
+        mesh = [int(2**np.ceil(log2/2)),int(2**np.floor(log2/2))]
+    logger.info("running on processor mesh={}".format(mesh))
 
 
 # Bases and domain
@@ -55,7 +97,7 @@ solver.stop_sim_time = 10
 dt = 0.2*1/n
 
 # Analysis
-snapshots = solver.evaluator.add_file_handler('snapshots', sim_dt=0.1, max_writes=10)
+snapshots = solver.evaluator.add_file_handler('{:}/snapshots'.format(data_dir), sim_dt=0.1, max_writes=10)
 snapshots.add_system(solver.state)
 snapshots.add_task(u, name='u_hat', layout='c')
 snapshots.add_task(v, name='v_hat', layout='c')
