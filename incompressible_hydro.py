@@ -90,12 +90,12 @@ problem.substitutions['u_grad(A)'] = 'u*dx(A) + v*dy(A) + w*dz(A)'
 problem.substitutions['fx'] = 'cos(kx*x)'
 problem.substitutions['fy'] = 'cos(ky*y)'
 problem.substitutions['fz'] = 'cos(kz*z)'
-problem.substitutions['ω_x'] = 'dy(w) - dz(v)'
-problem.substitutions['ω_y'] = '-dx(w) + dz(u)'
-problem.substitutions['ω_z'] = 'dx(v) - dy(u)'
+problem.substitutions['O_x'] = 'dy(w) - dz(v)'
+problem.substitutions['O_y'] = '-dx(w) + dz(u)'
+problem.substitutions['O_z'] = 'dx(v) - dy(u)'
 problem.substitutions['KE'] = '0.5*(u*u+v*v+w*w)'
 problem.substitutions['Re'] = 'sqrt(u*u + v*v + w*w) / R'
-problem.substitutions['enstrophy'] = 'ω_x*ω_x+ω_y*ω_y+ω_z*ω_z'
+problem.substitutions['enstrophy'] = 'O_x*O_x+O_y*O_y+O_z*O_z'
 problem.substitutions['vol_avg(A)']   = 'integ(A)/Lx/Ly/Lz'
 problem.add_equation('dt(u) + dx(p) - R*Lap(u) = -u_grad(u) + fx')
 problem.add_equation('dt(v) + dy(p) - R*Lap(v) = -u_grad(v) + fy')
@@ -139,6 +139,7 @@ CFL.add_velocities(('u', 'v', 'w'))
 # Flow properties
 flow = flow_tools.GlobalFlowProperty(solver, cadence=report_cadence)
 flow.add_property('Re', name='Re')
+flow.add_property('enstrophy', name='enstrophy')
 
 # Main loop
 try:
@@ -147,8 +148,10 @@ try:
     while solver.proceed:
         dt = CFL.compute_dt()
         dt = solver.step(dt)
-        if (solver.iteration-1) % report_cadence == 0:
-            logger.info('Iteration: {:d}, Time: {:f}, dt: {:f}, Re = {:g}, {:g}'.format(solver.iteration, solver.sim_time, dt, flow.max('Re'), flow.volume_average('Re')))
+        if solver.iteration == 1 or (solver.iteration) % report_cadence == 0:
+            log_string = 'Iteration: {:d}, Time: {:f}, dt: {:f}, Re = {:g}, Ens = {:g}'.format(
+                solver.iteration, solver.sim_time, dt, flow.volume_average('Re'), flow.volume_average('enstrophy'))
+            logger.info(log_string)
 except:
     logger.error('Exception raised, triggering end of main loop.')
     raise
