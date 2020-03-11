@@ -10,6 +10,9 @@ Options:
     --k=<k>           k-value to stir domain at [default: 10]
     --Reynolds=<Re>   Reynolds number of the turbulence [default: 1000]
 
+    --dt=<dt>         Initial dt, default is at dt=Re
+
+
     --mesh=<mesh>     Processor mesh, takes format n1,n2 for a 2-d mesh decomposition of n1xn2 cores
 
 """
@@ -66,11 +69,12 @@ else:
         mesh = [int(2**np.ceil(log2/2)),int(2**np.floor(log2/2))]
     logger.info("running on processor mesh={}".format(mesh))
 
+Lx = Ly = Lz = 2*np.pi
 
 # Bases and domain
-x_basis = de.Fourier('x', nx, interval=(0, 2*np.pi))
-y_basis = de.Fourier('y', ny, interval=(0, 2*np.pi))
-z_basis = de.Fourier('z', ny, interval=(0, 2*np.pi))
+x_basis = de.Fourier('x', nx, interval=(0, Lx))
+y_basis = de.Fourier('y', ny, interval=(0, Ly))
+z_basis = de.Fourier('z', ny, interval=(0, Lz))
 domain = de.Domain([x_basis, y_basis, z_basis], grid_dtype='float')
 
 problem = de.IVP(domain, variables=['u','v','w','p'])
@@ -78,11 +82,21 @@ problem.parameters['R'] = 1/Re
 problem.parameters['kx'] = kx
 problem.parameters['ky'] = ky
 problem.parameters['kz'] = kz
+problem.parameters['Lx'] = Lx
+problem.parameters['Ly'] = Ly
+problem.parameters['Lz'] = Lz
 problem.substitutions['Lap(A)'] = 'dx(dx(A))+dy(dy(A))+dz(dz(A))'
 problem.substitutions['u_grad(A)'] = 'u*dx(A) + v*dy(A) + w*dz(A)'
 problem.substitutions['fx'] = 'cos(kx*x)'
 problem.substitutions['fy'] = 'cos(ky*y)'
 problem.substitutions['fz'] = 'cos(kz*z)'
+problem.substitutions['ω_x'] = 'dy(w) - dz(v)'
+problem.substitutions['ω_y'] = '-dx(w) + dz(u)'
+problem.substitutions['ω_z'] = 'dx(v) - dy(u)'
+problem.substitutions['KE'] = '0.5*(u*u+v*v+w*w)'
+problem.substitutions['Re'] = 'sqrt(u*u + v*v + w*w) / R'
+problem.substitutions['enstrophy'] = 'ω_x*ω_x+ω_y*ω_y+ω_z*ω_z'
+problem.substitutions['vol_avg(A)']   = 'integ(A)/Lx/Ly/Lz'
 problem.add_equation('dt(u) + dx(p) - R*Lap(u) = -u_grad(u) + fx')
 problem.add_equation('dt(v) + dy(p) - R*Lap(v) = -u_grad(v) + fy')
 problem.add_equation('dt(w) + dz(p) - R*Lap(w) = -u_grad(w) + fz')
@@ -94,25 +108,37 @@ solver = problem.build_solver(de.timesteppers.SBDF4)
 logger.info('Solver built')
 
 # Integration parameters
-solver.stop_sim_time = Re
+solver.stop_sim_time = np.inf #Re
+solver.stop_wall_time = np.inf
 
-dt = 1
+if args['--dt']:
+    dt = float(args['--dt'])
+else:
+    dt = Re
+
+cfl_cadence = 10
+report_cadence = 10
+out_dt = 10*dt
 
 # Analysis
-snapshots = solver.evaluator.add_file_handler('{:}/snapshots'.format(data_dir), sim_dt=1, max_writes=10)
+snapshots = solver.evaluator.add_file_handler('{:}/snapshots'.format(data_dir), sim_dt=out_dt, max_writes=10)
 snapshots.add_system(solver.state)
 snapshots.add_task('u', name='u_hat', layout='c')
 snapshots.add_task('v', name='v_hat', layout='c')
 snapshots.add_task('w', name='w_hat', layout='c')
+scalar = solver.evaluator.add_file_handler('{:}/scalar'.format(data_dir), sim_dt=out_dt, max_writes=np.inf)
+scalar.add_task('vol_avg(KE)', name='KE')
+scalar.add_task('vol_avg(enstrophy)', name='enstrophy')
+scalar.add_task('vol_avg(Re)', name='Re')
 
 # CFL
-CFL = flow_tools.CFL(solver, initial_dt=dt, cadence=10, safety=0.4,
+CFL = flow_tools.CFL(solver, initial_dt=dt, cadence=cfl_cadence, safety=0.4,
                      max_change=1.5, min_change=0.5, max_dt=dt, threshold=0.1)
 CFL.add_velocities(('u', 'v', 'w'))
 
 # Flow properties
-flow = flow_tools.GlobalFlowProperty(solver, cadence=1)
-flow.add_property("sqrt(u*u + v*v + w*w) / R", name='Re')
+flow = flow_tools.GlobalFlowProperty(solver, cadence=report_cadence)
+flow.add_property('Re', name='Re')
 
 # Main loop
 try:
@@ -121,7 +147,7 @@ try:
     while solver.proceed:
         dt = CFL.compute_dt()
         dt = solver.step(dt)
-        if (solver.iteration-1) % 1 == 0:
+        if (solver.iteration-1) % report_cadence == 0:
             logger.info('Iteration: {:d}, Time: {:f}, dt: {:f}, Re = {:g}, {:g}'.format(solver.iteration, solver.sim_time, dt, flow.max('Re'), flow.volume_average('Re')))
 except:
     logger.error('Exception raised, triggering end of main loop.')
