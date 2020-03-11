@@ -81,17 +81,15 @@ domain = de.Domain([x_basis, y_basis, z_basis], grid_dtype='float')
 
 problem = de.IVP(domain, variables=['u','v','w','p'])
 problem.parameters['R'] = 1/Re
-problem.parameters['kx'] = kx
-problem.parameters['ky'] = ky
-problem.parameters['kz'] = kz
+problem.parameters['k'] = k
 problem.parameters['Lx'] = Lx
 problem.parameters['Ly'] = Ly
 problem.parameters['Lz'] = Lz
 problem.substitutions['Lap(A)'] = 'dx(dx(A))+dy(dy(A))+dz(dz(A))'
 problem.substitutions['u_grad(A)'] = 'u*dx(A) + v*dy(A) + w*dz(A)'
-problem.substitutions['fx'] = 'cos(ky*y)'
-problem.substitutions['fy'] = 'cos(kz*z)'
-problem.substitutions['fz'] = 'cos(kx*x)'
+problem.substitutions['fx'] = 'cos(k*x)*cos(k*z)'
+problem.substitutions['fy'] = 'cos(k*y)*cos(k*z)'
+problem.substitutions['fz'] = '(sin(k*x)+sin(k*y))*sin(k*z)'
 problem.substitutions['O_x'] = 'dy(w) - dz(v)'
 problem.substitutions['O_y'] = '-dx(w) + dz(u)'
 problem.substitutions['O_z'] = 'dx(v) - dy(u)'
