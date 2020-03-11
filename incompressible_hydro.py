@@ -8,13 +8,13 @@ Usage:
 Options:
     --n=<n>           Fourier resolution of domain, nxnxn [default: 128]
     --k=<k>           k-value to stir domain at [default: 10]
-    --Reynolds=<Re>   Reynolds number of the turbulence [default: 1000]
+    --Reynolds=<Re>   Reynolds number of the turbulence [default: 1e3]
 
     --dt=<dt>         Initial dt, default is at dt=Re
 
-
     --mesh=<mesh>     Processor mesh, takes format n1,n2 for a 2-d mesh decomposition of n1xn2 cores
 
+    --label=<label>   Case name label
 """
 
 import numpy as np
@@ -43,6 +43,8 @@ Re = float(args['--Reynolds'])
 # save data in directory named after script
 data_dir = sys.argv[0].split('.py')[0]
 data_dir += '_Re{:}_n{:}'.format(args['--Reynolds'], args['--n'])
+if args['--label']:
+    data_dir += '_{:s}'.format(args['--label'])
 
 from dedalus.tools.config import config
 
@@ -97,9 +99,9 @@ problem.substitutions['KE'] = '0.5*(u*u+v*v+w*w)'
 problem.substitutions['Re'] = 'sqrt(u*u + v*v + w*w) / R'
 problem.substitutions['enstrophy'] = 'O_x*O_x+O_y*O_y+O_z*O_z'
 problem.substitutions['vol_avg(A)']   = 'integ(A)/Lx/Ly/Lz'
-problem.add_equation('dt(u) + dx(p) - R*Lap(u) = -u_grad(u) + fx')
-problem.add_equation('dt(v) + dy(p) - R*Lap(v) = -u_grad(v) + fy')
-problem.add_equation('dt(w) + dz(p) - R*Lap(w) = -u_grad(w) + fz')
+problem.add_equation('dt(u) + dx(p) - Lap(u) = -u_grad(u) + Re**2*fx')
+problem.add_equation('dt(v) + dy(p) - Lap(v) = -u_grad(v) + Re**2*fy')
+problem.add_equation('dt(w) + dz(p) - Lap(w) = -u_grad(w) + Re**2*fz')
 problem.add_equation('dx(u) + dy(v) + dz(w) = 0', condition="(nx != 0) or (ny != 0) or (nz != 0)")
 problem.add_equation('p = 0', condition="(nx == 0) and (ny == 0) and (nz == 0)")
 
@@ -139,7 +141,7 @@ Az = domain.new_field()
 noise_x = global_noise(domain, scale=1, filter_scale=0.5, seed=42)
 noise_y = global_noise(domain, scale=1, filter_scale=0.5, seed=43)
 noise_z = global_noise(domain, scale=1, filter_scale=0.5, seed=44)
-amp = 1/Re
+amp = 0.1*1/Re
 # for noise perturbations that respect div.u=0, populate A with noise and take u=curl(A)
 Ax['g'] = amp*noise_x['g']
 Ay['g'] = amp*noise_y['g']
@@ -158,8 +160,8 @@ if args['--dt']:
 else:
     dt = Re
 
-cfl_cadence = 10
-report_cadence = 10
+cfl_cadence = 1
+report_cadence = 1
 out_dt = 10*dt
 
 # Analysis
@@ -187,13 +189,15 @@ flow.add_property('enstrophy', name='enstrophy')
 try:
     logger.info('Starting loop')
     start_time = time.time()
-    while solver.proceed:
+    good_solution = True
+    while solver.proceed and good_solution:
         dt = CFL.compute_dt()
         dt = solver.step(dt)
         if solver.iteration == 1 or (solver.iteration) % report_cadence == 0:
-            log_string = 'Iteration: {:d}, Time: {:f}, dt: {:f}, Re = {:g}, Ens = {:g}'.format(
+            log_string = 'Iteration: {:d}, Time: {:g}, dt: {:5.2g}, Re = {:.3g}, Ens = {:.3g}'.format(
                 solver.iteration, solver.sim_time, dt, flow.volume_average('Re'), flow.volume_average('enstrophy'))
             logger.info(log_string)
+            good_solution = np.isfinite(flow.volume_average('Re'))
 except:
     logger.error('Exception raised, triggering end of main loop.')
     raise
