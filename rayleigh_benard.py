@@ -42,7 +42,7 @@ size = comm.size
 aspect = float(args['--aspect'])
 nz = int(args['--nz'])
 if args['--nx']:
-    nx = ny = int(args['--nx'])
+    nx = ny = aspect*int(args['--nx'])
 else:
     nx = ny = nz
 
@@ -51,7 +51,7 @@ Prandtl = float(Fraction(args['--Prandtl']))
 
 # save data in directory named after script
 data_dir = sys.argv[0].split('.py')[0]
-data_dir += '_Ra{:}_Pr{:}_nx{:}_nz{:}'.format(args['--Rayleigh'], args['--Prandtl'], args['--nx'], args['--nz'])
+data_dir += '_Ra{:}_Pr{:}_nx{:d}_nz{:d}'.format(args['--Rayleigh'], args['--Prandtl'], nx, nz)
 if args['--label']:
     data_dir += '_{:s}'.format(args['--label'])
 
