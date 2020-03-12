@@ -79,7 +79,7 @@ y_basis = de.Fourier('y', ny, interval=(0, Ly))
 z_basis = de.Fourier('z', nz, interval=(0, Lz))
 domain = de.Domain([x_basis, y_basis, z_basis], grid_dtype='float')
 
-problem = de.IVP(domain, variables=['u','v','w','p'])
+problem = de.IVP(domain, variables=['u','v','w','p','lubar','lubart'])
 problem.parameters['R'] = 1/Re
 problem.parameters['k'] = k
 problem.parameters['Lx'] = Lx
