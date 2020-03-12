@@ -76,7 +76,7 @@ Lx = Ly = Lz = 2*np.pi
 # Bases and domain
 x_basis = de.Fourier('x', nx, interval=(0, Lx))
 y_basis = de.Fourier('y', ny, interval=(0, Ly))
-z_basis = de.Fourier('z', ny, interval=(0, Lz))
+z_basis = de.Fourier('z', nz, interval=(0, Lz))
 domain = de.Domain([x_basis, y_basis, z_basis], grid_dtype='float')
 
 problem = de.IVP(domain, variables=['u','v','w','p'])

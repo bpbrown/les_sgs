@@ -3,12 +3,13 @@ Dedalus script for incompressible forced turbulence,
 to test SGS methods for LES.
 
 Usage:
-    incompressible_hydro.py [options]
+    boussinesq_hydro.py [options]
 
 Options:
     --n=<n>           Fourier resolution of domain, nxnxn [default: 128]
     --k=<k>           k-value to stir domain at [default: 10]
     --Reynolds=<Re>   Reynolds number of the turbulence [default: 1e3]
+    --Prandtl=<Pr>    Prandtl number [default: 1/3]
 
     --dt=<dt>         Initial dt, default is at dt=Re
 
@@ -28,6 +29,8 @@ from mpi4py import MPI
 import logging
 import time
 
+from fractions import Fraction
+
 from docopt import docopt
 args = docopt(__doc__)
 
@@ -39,10 +42,11 @@ size = comm.size
 nx = ny = nz = n = int(args['--n'])
 kx = ky = kz = k = float(args['--k'])
 Re = float(args['--Reynolds'])
+Pr = float(Fraction(args['--Prandtl']))
 
 # save data in directory named after script
 data_dir = sys.argv[0].split('.py')[0]
-data_dir += '_Re{:}_n{:}'.format(args['--Reynolds'], args['--n'])
+data_dir += '_Re{:}_Pr{:.3g}_n{:}'.format(args['--Reynolds'], Pr, args['--n'])
 if args['--label']:
     data_dir += '_{:s}'.format(args['--label'])
 
@@ -79,7 +83,7 @@ y_basis = de.Fourier('y', ny, interval=(0, Ly))
 z_basis = de.Fourier('z', nz, interval=(0, Lz))
 domain = de.Domain([x_basis, y_basis, z_basis], grid_dtype='float')
 
-problem = de.IVP(domain, variables=['u','v','w','p'])
+problem = de.IVP(domain, variables=['u','v','w','p','b'])
 problem.parameters['R'] = 1/Re
 problem.parameters['k'] = k
 problem.parameters['Lx'] = Lx
@@ -97,9 +101,10 @@ problem.substitutions['KE'] = '0.5*(u*u+v*v+w*w)'
 problem.substitutions['Re'] = 'sqrt(u*u + v*v + w*w) / R'
 problem.substitutions['enstrophy'] = 'O_x*O_x+O_y*O_y+O_z*O_z'
 problem.substitutions['vol_avg(A)']   = 'integ(A)/Lx/Ly/Lz'
+problem.add_equation('dt(b) - w*F - Pr*Lap(b) = -u_grad(b)')
 problem.add_equation('dt(u) + dx(p) - Lap(u) = -u_grad(u) + Re**2*fx')
 problem.add_equation('dt(v) + dy(p) - Lap(v) = -u_grad(v) + Re**2*fy')
-problem.add_equation('dt(w) + dz(p) - Lap(w) = -u_grad(w) + Re**2*fz')
+problem.add_equation('dt(w) + dz(p) - Lap(w) = -u_grad(w) + b + Re**2*fz')
 problem.add_equation('dx(u) + dy(v) + dz(w) = 0', condition="(nx != 0) or (ny != 0) or (nz != 0)")
 problem.add_equation('p = 0', condition="(nx == 0) and (ny == 0) and (nz == 0)")
 
