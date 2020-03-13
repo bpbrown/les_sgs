@@ -42,9 +42,9 @@ size = comm.size
 aspect = float(args['--aspect'])
 nz = int(args['--nz'])
 if args['--nx']:
-    nx = ny = aspect*int(args['--nx'])
+    nx = ny = int(args['--nx'])
 else:
-    nx = ny = nz
+    nx = ny = int(aspect*nz)
 
 Rayleigh = float(args['--Rayleigh'])
 Prandtl = float(Fraction(args['--Prandtl']))
@@ -241,4 +241,4 @@ finally:
     logger.info('Sim end time: {:f}'.format(solver.sim_time))
     logger.info('Run time: {:f} sec'.format(main_loop_time))
     logger.info('Run time: {:f} cpu-hr'.format(n_cpu*main_loop_time/(3600)))
-    logger.info('mode-iter/cpu-sec: {:f} (main loop only)'.format(n_iter_loop*n**3/(main_loop_time*n_cpu)))
+    logger.info('mode-iter/cpu-sec: {:f} (main loop only)'.format(n_iter_loop*nx*ny*nz/(main_loop_time*n_cpu)))
