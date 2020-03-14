@@ -44,21 +44,35 @@ for file in files:
         data[key] = f['tasks/'+key][:,:,:,0]
     f.close()
 
-    print(data['u midplane c'].shape)
-    u_c = data['u midplane c'][0,:,:]
+    pow = 0
+    n_t = t.shape[0]
+    for i in range(n_t):
+        u_c = data['u midplane c'][i,:,:]
+        v_c = data['v midplane c'][i,:,:]
+        pow += np.abs(u_c*np.conj(u_c)+v_c*np.conj(v_c))
+    pow /= n_t
+    n_ky = ky.shape[0]
+
+    y_shift = int((n_ky+1)/2)
+    pow = np.roll(pow,-y_shift,axis=1)
+    ky = np.roll(ky,  -y_shift,axis=0)
+
+    kx_g, ky_g = np.meshgrid(kx, ky)
+
+
     u = data['u midplane'][0,:,:]
-    v_c = data['v midplane c'][0,:,:]
     v = data['v midplane'][0,:,:]
     w = data['w midplane'][0,:,:]
-    pow = np.abs(u_c*np.conj(u_c)+v_c*np.conj(v_c))
-    kx_g, ky_g = np.meshgrid(kx, ky)
     x_g, y_g = np.meshgrid(x, y)
 
-    ax_spectra2d[0].pcolormesh(kx, ky, np.log(pow).T, shading='flat')
+    arrow=(slice(None,None,8),slice(None,None,8))
+
+    ax_spectra2d[0].pcolormesh(kx_g, ky_g, np.log(pow).T, shading='flat')
     ax_spectra2d[0].set_xlabel(r'$k_x$')
     ax_spectra2d[0].set_ylabel(r'$k_y$')
-    ax_spectra2d[1].pcolormesh(x, y, w.T, shading='flat')
-    ax_spectra2d[1].quiver(x, y, u.T, v.T, units='xy', scale=0.5)
+    ax_spectra2d[1].pcolormesh(x_g, y_g, w.T, shading='flat')
+    ax_spectra2d[1].quiver(x_g[arrow], y_g[arrow], u[arrow].T, v[arrow].T, units='xy', scale=0.9)
+    ax_spectra2d[1].yaxis.tick_right()
 
     ax_spectra2d[1].set_xlabel(r'$x$')
     ax_spectra2d[1].set_ylabel(r'$y$')
@@ -66,7 +80,7 @@ for file in files:
 
     avg_spectra = np.mean(pow, axis=1)
     ax_spectra.plot(kx, avg_spectra)
-    ax_spectra.set_ylabel('Power spectrum (u*u)')
+    ax_spectra.set_ylabel(r'Horizontal power spectrum ($u_\perp*u_\perp$)')
     ax_spectra.set_xlabel(r'$k_\perp$')
     ax_spectra.set_yscale('log')
     ax_spectra.set_xscale('log')
