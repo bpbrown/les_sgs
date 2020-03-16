@@ -19,14 +19,10 @@ Options:
 """
 
 import numpy as np
-import dedalus.public as de
-from dedalus.extras import flow_tools
-
 import sys
 import os
 from mpi4py import MPI
 
-import logging
 import time
 
 from fractions import Fraction
@@ -66,9 +62,13 @@ if rank == 0:
     logdir = os.path.join(data_dir,'logs')
     if not os.path.exists(logdir):
         os.mkdir(logdir)
+
+import logging
 logger = logging.getLogger(__name__)
 logger.info("saving run in: {}".format(data_dir))
 
+import dedalus.public as de
+from dedalus.extras import flow_tools
 
 mesh = args['--mesh']
 if mesh is not None:
