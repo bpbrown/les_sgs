@@ -80,6 +80,13 @@ else:
         mesh = [int(2**np.ceil(log2/2)),int(2**np.floor(log2/2))]
     logger.info("running on processor mesh={}".format(mesh))
 
+logger.info(sys.argv)
+logger.info('-'*40)
+logger.info("Run parameters")
+for key in args:
+    logger.info("{} = {}".format(key, args[key]))
+logger.info('-'*40)
+
 Lz = 1
 Lx = Ly = aspect*Lz
 
@@ -87,7 +94,7 @@ Lx = Ly = aspect*Lz
 x_basis = de.Fourier('x', nx, interval=(-Lx/2, Lx/2))
 y_basis = de.Fourier('y', ny, interval=(-Ly/2, Ly/2))
 z_basis = de.Chebyshev('z', nz, interval=(0, Lz))
-domain = de.Domain([x_basis, y_basis, z_basis], grid_dtype='float')
+domain = de.Domain([x_basis, y_basis, z_basis], grid_dtype='float', mesh=mesh)
 
 problem = de.IVP(domain, variables=['T','T_z','Ox','Oy','p','u','v','w'])
 problem.meta['p','T','u','v','w']['z']['dirichlet'] = True
