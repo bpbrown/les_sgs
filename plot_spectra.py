@@ -82,25 +82,37 @@ for q in pow:
     pow[q] = np.roll(pow[q],-ky_shift,axis=1)
 ky = np.roll(ky,  -ky_shift,axis=0)
 
-kx_g, ky_g = np.meshgrid(kx, ky)
+kx_g, ky_g = np.meshgrid(kx, ky, indexing='ij')
+logger.info("kx {}, ky {}".format(kx.shape, ky.shape))
+logger.info("kx_g {}, ky_g {}".format(kx_g.shape, ky_g.shape))
+logger.info("pow {}".format(pow[u_tot_tag].shape))
+n_kx = kx.shape[0]
+n_theta = 16 #256
+n_kr = 16 #256
+#theta = np.zeros((n_ky,n_kx)) + np.arctan2(ky_g, kx_g) +np.pi/2
+theta = np.arctan2(ky_g, kx_g)
+theta_u = np.linspace(0, np.pi, n_theta)
+kr = np.sqrt(kx_g*kx_g+ky_g*ky_g)
+kr_u = np.linspace(0, np.max(kr), n_kr)
 
-# n_theta = n_ky
-# n_kx = n_kr = kx.shape[0]
-# theta = np.zeros(n_kx,n_ky) + np.arctan2(ky_g, kx_g)+np.pi
-# theta_u = np.linspace(0, 2*np.pi, n_theta)
-# kr = np.sqrt(kx_g*kx_g+ky_g*ky_g)
-# kr_u = np.linspace(0, np.max(kr), n_kr)
-#
-# from scipy.interpolate import RegularGridInterpolator
-# original_coords_flat = (theta.flatten(), kr.flatten())
-# new_coords_flat = (theta_u.flatten(), kr_u.flatten())
-# points = np.array(list(zip(*new_coords_flat)))
-# F_interp = RegularGridInterpolator(original_coords_flat, pow, bounds_error=False, fill_value=0)
-#
-# start_int = time.time()
-# pow_u = F_interp(points).reshape((n_x, n_y, n_z))
-# end_int = time.time()
-# print("Interpolation took {:g} seconds".format(end_int-start_int))
+fig_grid, ax_grid = plt.subplots(ncols=2, nrows=2, figsize=[6,6])
+ax_grid[0,0].pcolormesh(kx_g, ky_g, kx_g, shading='flat')
+ax_grid[0,1].pcolormesh(kx_g, ky_g, ky_g, shading='flat')
+ax_grid[1,0].pcolormesh(kx_g, ky_g, theta, shading='flat')
+ax_grid[1,1].pcolormesh(kx_g, ky_g, kr, shading='flat')
+fig_grid.savefig('{:s}/grids.png'.format(str(output_path)), dpi=300)
+
+from scipy.interpolate import RegularGridInterpolator
+original_coords_flat = (theta.flatten(), kr.flatten())
+new_coords_flat = (theta_u.flatten(), kr_u.flatten())
+points = np.array(list(zip(*new_coords_flat)))
+
+F_interp = RegularGridInterpolator(original_coords_flat, pow[u_tot_tag], bounds_error=False, fill_value=0)
+
+start_int = time.time()
+pow_u = F_interp(points).reshape((n_x, n_y, n_z))
+end_int = time.time()
+print("Interpolation took {:g} seconds".format(end_int-start_int))
 
 u = data['u midplane'][-1,:,:]
 v = data['v midplane'][-1,:,:]
