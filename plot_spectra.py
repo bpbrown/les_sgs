@@ -34,10 +34,6 @@ else:
     data_dir += '/'
     output_path = pathlib.Path(data_dir).absolute()
 
-fig_spectra, ax_spectra = plt.subplots()
-#fig_spectra2d, ax_spectra2d = plt.subplots(ncols=3, figsize=[9,3])
-fig_spectra2d, ax_spectra2d = plt.subplots(ncols=2, figsize=[6,3])
-
 u_tot_tag = r'$u_\mathrm{tot}$'
 u_perp_tag = r'$u_\perp$'
 w_tag = '$w$'
@@ -45,7 +41,6 @@ T_tag = '$T$'
 pow = {u_perp_tag: 0, w_tag:0, u_tot_tag:0, T_tag:0}
 n_t = 0
 first_time = None
-
 
 for file in files:
     logger.info('opening {:s}'.format(file))
@@ -107,30 +102,52 @@ kx_g, ky_g = np.meshgrid(kx, ky)
 # end_int = time.time()
 # print("Interpolation took {:g} seconds".format(end_int-start_int))
 
-u = data['u midplane'][0,:,:]
-v = data['v midplane'][0,:,:]
-w = data['w midplane'][0,:,:]
+u = data['u midplane'][-1,:,:]
+v = data['v midplane'][-1,:,:]
+w = data['w midplane'][-1,:,:]
+T = data['T midplane'][-1,:,:]
 x_g, y_g = np.meshgrid(x, y)
 
 arrow=(slice(None,None,8),slice(None,None,8))
 
-ax_spectra2d[0].pcolormesh(kx_g, ky_g, np.log(pow[u_tot_tag]).T, shading='flat')
-ax_spectra2d[0].set_xlabel(r'$k_x$')
-ax_spectra2d[0].set_ylabel(r'$k_y$')
-ax_spectra2d[1].pcolormesh(x_g, y_g, w.T, shading='flat')
-ax_spectra2d[1].quiver(x_g[arrow], y_g[arrow], u[arrow].T, v[arrow].T, units='xy', scale=0.9)
-ax_spectra2d[1].yaxis.tick_right()
-ax_spectra2d[1].set_xlabel(r'$x$')
-ax_spectra2d[1].set_ylabel(r'$y$')
+
+fig_spectra2d, ax_spectra2d = plt.subplots(ncols=2, nrows=2, figsize=[6,6])
+
+ax_spectra2d[0,0].pcolormesh(kx_g, ky_g, np.log(pow[u_tot_tag]).T, shading='flat')
+ax_spectra2d[0,0].set_xlabel(r'$k_x$')
+ax_spectra2d[0,0].set_ylabel(r'$k_y$')
+ax_spectra2d[0,0].set_title(u_tot_tag)
+ax_spectra2d[0,1].pcolormesh(x_g, y_g, w.T, shading='flat')
+ax_spectra2d[0,1].quiver(x_g[arrow], y_g[arrow], u[arrow].T, v[arrow].T, units='xy', scale=0.9)
+ax_spectra2d[0,1].yaxis.tick_right()
+ax_spectra2d[0,1].set_title('t={:.3g}'.format(t[-1]))
+ax_spectra2d[0,1].set_xlabel(r'$x$')
+ax_spectra2d[0,1].set_ylabel(r'$y$')
 # ax_spectra2d[2].pcolormesh(theta_u, kr_u, np.log(pow_u).T, shading='flat', polar=True)
 # ax_spectra2d[2].set_rticks([])
 # ax_spectra2d[2].set_aspect(1)
 
+ax_spectra2d[1,0].pcolormesh(kx_g, ky_g, np.log(pow[T_tag]).T, shading='flat')
+ax_spectra2d[1,0].set_xlabel(r'$k_x$')
+ax_spectra2d[1,0].set_ylabel(r'$k_y$')
+ax_spectra2d[1,0].set_title(T_tag)
+ax_spectra2d[1,1].pcolormesh(x_g, y_g, T.T, shading='flat', cmap='RdYlBu')
+ax_spectra2d[1,1].yaxis.tick_right()
+ax_spectra2d[1,1].set_xlabel(r'$x$')
+ax_spectra2d[1,1].set_ylabel(r'$y$')
+
+
 fig_spectra2d.savefig('{:s}/power_spectrum_2d.png'.format(str(output_path)), dpi=300)
 
+
+fig_spectra, ax_spectra = plt.subplots()
 for q in pow:
     avg_spectra = np.mean(pow[q], axis=1)
     ax_spectra.plot(kx, avg_spectra, label=q)
+
+norm = np.max(pow[T_tag].T)
+logger.info('powerlaw k^(-5/3) norm is {:.3g}'.format(norm))
+ax_spectra.plot(kx, norm*kx**(-5/3), color='black', linestyle='dashed', label=r'$k_\perp^{-5/3}$')
 
 ax_spectra.legend()
 ax_spectra.set_ylabel(r'Horizontal power spectrum ($u_\perp*u_\perp$)')
