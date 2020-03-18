@@ -186,6 +186,7 @@ dt = 0.1
 
 cfl_cadence = 1
 report_cadence = 1
+hermitian_cadence = 100
 out_dt = 0.1
 
 # Analysis
@@ -229,9 +230,13 @@ try:
     start_time = time.time()
     good_solution = True
     while solver.proceed and good_solution:
+        if solver.iteration % hermitian_cadence == 0:
+            for field in solver.state.fields:
+                field.require_grid_space()
+
         dt = CFL.compute_dt()
         dt = solver.step(dt)
-        if solver.iteration == 1 or (solver.iteration) % report_cadence == 0:
+        if solver.iteration == 1 or solver.iteration % report_cadence == 0:
             log_string = 'Iteration: {:d}, Time: {:g}, dt: {:5.2g}, Re = {:.3g}, Ens = {:.3g}, Nu = {:.3g}'.format(
                 solver.iteration, solver.sim_time, dt, flow.volume_average('Re'), flow.volume_average('enstrophy'), flow.volume_average('Nu'))
             logger.info(log_string)
