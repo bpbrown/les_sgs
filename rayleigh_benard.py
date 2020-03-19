@@ -145,6 +145,7 @@ problem.add_bc("right(p) = 0", condition="(nx == 0) and (ny == 0)")
 
 # Build solver
 solver = problem.build_solver(de.timesteppers.SBDF4)
+timestepper_history = [0,1,2,3]
 logger.info('Solver built')
 
 
@@ -230,9 +231,10 @@ try:
     start_time = time.time()
     good_solution = True
     while solver.proceed and good_solution:
-        if solver.iteration % hermitian_cadence == 0:
+        if solver.iteration % hermitian_cadence in timestepper_history:
             for field in solver.state.fields:
                 field.require_grid_space()
+                logger.debug("enforced hermitiannes for {}".format(field))
 
         dt = CFL.compute_dt()
         dt = solver.step(dt)
