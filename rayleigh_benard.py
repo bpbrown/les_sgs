@@ -203,6 +203,12 @@ snapshots.add_task("interp(v, z={:})".format(Lz/2), name='v midplane')
 snapshots.add_task("interp(w, z={:})".format(Lz/2), name='w midplane')
 snapshots.add_task("interp(w*T, z={:})".format(Lz/2), name='h midplane')
 snapshots.add_task("interp(enth_flux, z={:})".format(Lz/2), name='enth midplane')
+snapshots.add_task("interp(T, y=0)", name='T xz')
+snapshots.add_task("interp(u, y=0)", name='u xz')
+snapshots.add_task("interp(v, y=0)", name='v xz')
+snapshots.add_task("interp(w, y=0)", name='w xz')
+snapshots.add_task("interp(w*T, y=0)", name='h xz')
+snapshots.add_task("interp(enth_flux, y=0)", name='enth xz')
 snapshots.add_task("plane_avg(enth_flux)", name='avg enth_flux')
 snapshots.add_task("plane_avg(cond_flux)", name='avg cond_flux')
 snapshots.add_task("plane_avg(Nu)", name='avg Nu')
@@ -234,7 +240,7 @@ try:
         if solver.iteration % hermitian_cadence in timestepper_history:
             for field in solver.state.fields:
                 field.require_grid_space()
-                logger.debug("enforced hermitiannes for {}".format(field))
+                logger.debug("Hermitian enforcment for {}".format(field))
 
         dt = CFL.compute_dt()
         dt = solver.step(dt)
