@@ -15,6 +15,8 @@ Options:
 
     --mesh=<mesh>     Processor mesh, takes format n1,n2 for a 2-d mesh decomposition of n1xn2 cores
 
+    --SBDF4           Use SBDF4
+
     --label=<label>   Case name label
 """
 
@@ -144,9 +146,17 @@ problem.add_bc("right(w) = 0", condition="(nx != 0) or (ny != 0)")
 problem.add_bc("right(p) = 0", condition="(nx == 0) and (ny == 0)")
 
 # Build solver
-solver = problem.build_solver(de.timesteppers.SBDF4)
-timestepper_history = [0,1,2,3]
-logger.info('Solver built')
+if args['--SBDF4']:
+    ts = de.timesteppers.SBDF4
+    timestepper_history = [0,1,2,3]
+    safety = 0.2
+else:
+    ts = de.timesteppers.SBDF2
+    timestepper_history = [0,1]
+    safety = 0.4
+
+solver = problem.build_solver(ts)
+logger.info('Solver built using {}'.format(ts))
 
 
 # Initial conditions
@@ -221,7 +231,7 @@ scalar.add_task('vol_avg(Re)', name='Re')
 scalar.add_task('vol_avg(Nu)', name='Nu')
 
 # CFL
-CFL = flow_tools.CFL(solver, initial_dt=dt, cadence=cfl_cadence, safety=0.4,
+CFL = flow_tools.CFL(solver, initial_dt=dt, cadence=cfl_cadence, safety=safety,
                      max_change=1.5, min_change=0.5, max_dt=dt, threshold=0.1)
 CFL.add_velocities(('u', 'v', 'w'))
 
