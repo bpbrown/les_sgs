@@ -114,7 +114,7 @@ from scipy.interpolate import griddata
 start_int = time.time()
 pow_u ={}
 for tag in pow:
-    pow_u[tag] = griddata(original_coords_flat, pow[tag].flatten(), (theta_u_g, kr_u_g), method='cubic')
+    pow_u[tag] = griddata(original_coords_flat, pow[tag].flatten(), (theta_u_g, kr_u_g))
     logger.info(pow_u[tag].shape)
 end_int = time.time()
 print("Interpolation took {:g} seconds".format(end_int-start_int))
@@ -127,10 +127,16 @@ T = data['T midplane'][-1,:,:]
 x_g, y_g = np.meshgrid(x, y)
 kx_g, ky_g = np.meshgrid(kx, ky)
 
-fig_spectra, ax_spectra = plt.subplots(ncols=1, nrows=2, figsize=[6,3], subplot_kw=dict(polar=True))
-ax_spectra[0].pcolormesh(theta_u_g, kr_u_g, np.log(pow_u[u_tot_tag]).T, shading='flat')
-ax_spectra[1].pcolormesh(theta_u_g, kr_u_g, np.log(pow_u[T_tag]).T, shading='flat')
-fig_spectra2d.savefig('{:s}/power_spectrum_2d_kr.png'.format(str(output_path)), dpi=300)
+kr_u_g, theta_u_g = np.meshgrid(kr_u, theta_u)
+fig_spectra, ax_spectra = plt.subplots(ncols=2, nrows=1, figsize=[6,3], subplot_kw=dict(polar=True))
+ax_spectra[0].pcolormesh(theta_u_g, kr_u_g, np.log(pow_u[u_tot_tag]), shading='flat')
+ax_spectra[1].pcolormesh(theta_u_g, kr_u_g, np.log(pow_u[T_tag]), shading='flat')
+for ax in ax_spectra:
+    ax.set_aspect(1)
+    ax.set_thetalim(np.pi/2,-np.pi/2)
+    ax.set_theta_offset(0)
+    ax.set_xticks(np.linspace(-np.pi/2,np.pi/2, num=7))
+fig_spectra.savefig('{:s}/power_spectrum_2d_kr.png'.format(str(output_path)), dpi=300)
 
 arrow=(slice(None,None,8),slice(None,None,8))
 
