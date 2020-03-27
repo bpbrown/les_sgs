@@ -92,9 +92,10 @@ n_theta = 2*n_kx
 n_kr = n_kx
 
 theta = np.arctan2(ky_g, kx_g)
-theta_u = np.linspace(-np.pi/2, np.pi/2, n_theta)
 kr = np.sqrt(kx_g*kx_g+ky_g*ky_g)
-kr_u = np.linspace(0, np.max(kr), n_kr)
+
+theta_u = np.linspace(-np.pi/2, np.pi/2, n_theta)
+kr_u = np.linspace(0, np.max(kx), n_kr)
 
 fig_grid, ax_grid = plt.subplots(ncols=2, nrows=2, figsize=[6,6])
 ax_grid[0,0].pcolormesh(kx_g, ky_g, kx_g, shading='flat')
@@ -104,10 +105,7 @@ ax_grid[1,1].pcolormesh(kx_g, ky_g, kr, shading='flat')
 fig_grid.savefig('{:s}/grids.png'.format(str(output_path)), dpi=300)
 
 original_coords_flat = (theta.flatten(), kr.flatten())
-
-theta_u_g, kr_u_g = np.meshgrid(theta_u, kr_u, indexing='ij')
-new_coords_flat = (theta_u.flatten(), kr_u.flatten())
-
+kr_u_g, theta_u_g = np.meshgrid(kr_u, theta_u)
 
 from scipy.interpolate import griddata
 
@@ -127,7 +125,6 @@ T = data['T midplane'][-1,:,:]
 x_g, y_g = np.meshgrid(x, y)
 kx_g, ky_g = np.meshgrid(kx, ky)
 
-kr_u_g, theta_u_g = np.meshgrid(kr_u, theta_u)
 fig_spectra, ax_spectra = plt.subplots(ncols=2, nrows=1, figsize=[6,3], subplot_kw=dict(polar=True))
 ax_spectra[0].pcolormesh(theta_u_g, kr_u_g, np.log(pow_u[u_tot_tag]), shading='flat')
 ax_spectra[1].pcolormesh(theta_u_g, kr_u_g, np.log(pow_u[T_tag]), shading='flat')
@@ -171,12 +168,14 @@ fig_spectra2d.savefig('{:s}/power_spectrum_2d.png'.format(str(output_path)), dpi
 fig_spectra, ax_spectra = plt.subplots()
 for q in pow:
     print(pow_u[q].shape)
-    avg_spectra = np.mean(pow_u[q], axis=0)
+    avg_spectra = np.nanmean(pow_u[q], axis=0)
     ax_spectra.plot(kr_u, avg_spectra, label=q)
-    avg_spectra = np.mean(pow[q], axis=1)
-    ax_spectra.plot(kx, avg_spectra, label=q, linestyle='dashed')
+min_y, max_y = ax_spectra.get_ylim()
+ax_spectra.set_ylim(max_y*1e-12,max_y)
 
-norm = np.max(pow[T_tag])
+print(np.nanmean(pow_u[T_tag], axis=0))
+norm = np.nanmax(np.nanmean(pow_u[T_tag], axis=0))
+
 logger.info('powerlaw k^(-5/3) norm is {:.3g}'.format(norm))
 ax_spectra.plot(kx, norm*kx**(-5/3), color='black', linestyle='dashed', label=r'$k_\perp^{-5/3}$')
 
