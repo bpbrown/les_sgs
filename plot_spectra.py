@@ -14,6 +14,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import pathlib
 import h5py
+import time
 
 # needed for logging to work
 import dedalus.public as de
@@ -87,11 +88,11 @@ logger.info("kx {}, ky {}".format(kx.shape, ky.shape))
 logger.info("kx_g {}, ky_g {}".format(kx_g.shape, ky_g.shape))
 logger.info("pow {}".format(pow[u_tot_tag].shape))
 n_kx = kx.shape[0]
-n_theta = 16 #256
-n_kr = 16 #256
-#theta = np.zeros((n_ky,n_kx)) + np.arctan2(ky_g, kx_g) +np.pi/2
+n_theta = 2*n_kx
+n_kr = n_kx
+
 theta = np.arctan2(ky_g, kx_g)
-theta_u = np.linspace(0, np.pi, n_theta)
+theta_u = np.linspace(-np.pi/2, np.pi/2, n_theta)
 kr = np.sqrt(kx_g*kx_g+ky_g*ky_g)
 kr_u = np.linspace(0, np.max(kr), n_kr)
 
@@ -102,26 +103,36 @@ ax_grid[1,0].pcolormesh(kx_g, ky_g, theta, shading='flat')
 ax_grid[1,1].pcolormesh(kx_g, ky_g, kr, shading='flat')
 fig_grid.savefig('{:s}/grids.png'.format(str(output_path)), dpi=300)
 
-from scipy.interpolate import RegularGridInterpolator
 original_coords_flat = (theta.flatten(), kr.flatten())
-new_coords_flat = (theta_u.flatten(), kr_u.flatten())
-points = np.array(list(zip(*new_coords_flat)))
 
-F_interp = RegularGridInterpolator(original_coords_flat, pow[u_tot_tag], bounds_error=False, fill_value=0)
+theta_u_g, kr_u_g = np.meshgrid(theta_u, kr_u, indexing='ij')
+new_coords_flat = (theta_u.flatten(), kr_u.flatten())
+
+
+from scipy.interpolate import griddata
 
 start_int = time.time()
-pow_u = F_interp(points).reshape((n_x, n_y, n_z))
+pow_u ={}
+for tag in pow:
+    pow_u[tag] = griddata(original_coords_flat, pow[tag].flatten(), (theta_u_g, kr_u_g), method='cubic')
+    logger.info(pow_u[tag].shape)
 end_int = time.time()
 print("Interpolation took {:g} seconds".format(end_int-start_int))
+print(theta_u_g.shape, kr_u_g.shape)
 
 u = data['u midplane'][-1,:,:]
 v = data['v midplane'][-1,:,:]
 w = data['w midplane'][-1,:,:]
 T = data['T midplane'][-1,:,:]
 x_g, y_g = np.meshgrid(x, y)
+kx_g, ky_g = np.meshgrid(kx, ky)
+
+fig_spectra, ax_spectra = plt.subplots(ncols=1, nrows=2, figsize=[6,3], subplot_kw=dict(polar=True))
+ax_spectra[0].pcolormesh(theta_u_g, kr_u_g, np.log(pow_u[u_tot_tag]).T, shading='flat')
+ax_spectra[1].pcolormesh(theta_u_g, kr_u_g, np.log(pow_u[T_tag]).T, shading='flat')
+fig_spectra2d.savefig('{:s}/power_spectrum_2d_kr.png'.format(str(output_path)), dpi=300)
 
 arrow=(slice(None,None,8),slice(None,None,8))
-
 
 fig_spectra2d, ax_spectra2d = plt.subplots(ncols=2, nrows=2, figsize=[6,6])
 
@@ -151,13 +162,15 @@ ax_spectra2d[1,1].set_ylabel(r'$y$')
 
 fig_spectra2d.savefig('{:s}/power_spectrum_2d.png'.format(str(output_path)), dpi=300)
 
-
 fig_spectra, ax_spectra = plt.subplots()
 for q in pow:
+    print(pow_u[q].shape)
+    avg_spectra = np.mean(pow_u[q], axis=0)
+    ax_spectra.plot(kr_u, avg_spectra, label=q)
     avg_spectra = np.mean(pow[q], axis=1)
-    ax_spectra.plot(kx, avg_spectra, label=q)
+    ax_spectra.plot(kx, avg_spectra, label=q, linestyle='dashed')
 
-norm = np.max(pow[T_tag].T)
+norm = np.max(pow[T_tag])
 logger.info('powerlaw k^(-5/3) norm is {:.3g}'.format(norm))
 ax_spectra.plot(kx, norm*kx**(-5/3), color='black', linestyle='dashed', label=r'$k_\perp^{-5/3}$')
 
