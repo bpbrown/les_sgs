@@ -3,7 +3,7 @@ Dedalus script for incompressible thermally forced convection,
 to test SGS methods for LES.
 
 Usage:
-    boussinesq_hydro.py [options]
+    rayleigh_benard.py [options]
 
 Options:
     --nx=<nx>         Fourier horizontal resolution of domain, default is aspect*nz

@@ -171,10 +171,10 @@ for q in pow:
     avg_spectra = np.nanmean(pow_u[q], axis=0)
     ax_spectra.plot(kr_u, avg_spectra, label=q)
 min_y, max_y = ax_spectra.get_ylim()
-ax_spectra.set_ylim(max_y*1e-12,max_y)
+ax_spectra.set_ylim(max_y*1e-8,max_y)
 
-print(np.nanmean(pow_u[T_tag], axis=0))
-norm = np.nanmax(np.nanmean(pow_u[T_tag], axis=0))
+print(np.nanmean(pow_u[u_tot_tag], axis=0))
+norm = np.nanmax(np.nanmean(pow_u[u_tot_tag], axis=0))
 
 logger.info('powerlaw k^(-5/3) norm is {:.3g}'.format(norm))
 ax_spectra.plot(kx, norm*kx**(-5/3), color='black', linestyle='dashed', label=r'$k_\perp^{-5/3}$')
