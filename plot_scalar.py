@@ -94,17 +94,21 @@ fig_tau.savefig('{:s}/tau_error.pdf'.format(str(output_path)))
 
 fig_f, ax_f = plt.subplots(nrows=2)
 for ax in ax_f:
-    ax.plot(t, data['Re'], label='Re')
-    ax_r = ax.twinx()
-    ax_r.plot(t, data['Nu'], label='Nu', color='tab:orange')
+    p0 = ax.plot(t, data['Re'], label='Re')
+    ax2 = ax.twinx()
+    p1 = ax2.plot(t, data['Nu'], label='Nu', color='tab:orange')
+    ax2.set_ylabel('Nu')
+    ax2.yaxis.label.set_color('tab:orange')
     if subrange:
         ax.set_xlim(t_min,t_max)
     ax.set_xlabel('time')
-    ax.set_ylabel('fluid parameters')
-    ax.legend(loc='lower left')
+    ax.set_ylabel('Re')
+    lines = p0 + p1
+    labels = [l.get_label() for l in lines]
+    ax.legend(lines, labels, loc='lower left')
 
 ax_f[1].set_yscale('log')
-ax_r.set_yscale('log') # relies on it being the last instance; poor practice
+ax2.set_yscale('log') # relies on it being the last instance; poor practice
 
 fig_f.savefig('{:s}/Re_and_Nu.pdf'.format(str(output_path)))
 

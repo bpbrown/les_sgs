@@ -216,6 +216,7 @@ flow.add_property(np.sqrt(τ_b2**2), name='τb2')
 flow.add_property(np.sqrt(τ_p**2), name='τp')
 
 # Main loop
+vol = Lx*Lz
 try:
     good_solution = True
     logger.info('Starting loop')
@@ -223,10 +224,10 @@ try:
         solver.step(Δt)
         if (solver.iteration-1) % cadence == 0:
             max_Re = flow.max('Re')
-            avg_Re = flow.grid_average('Re')
-            avg_PE = flow.grid_average('PE')
-            avg_KE = flow.grid_average('KE')
-            avg_Nu = 1+flow.grid_average('f_c')/flow.grid_average('f_κ')
+            avg_Re = flow.volume_integral('Re')/vol
+            avg_PE = flow.volume_integral('PE')/vol
+            avg_KE = flow.volume_integral('KE')/vol
+            avg_Nu = 1+flow.volume_integral('f_c')/flow.volume_integral('f_κ')
             max_τ = np.max([flow.max('τu1'),flow.max('τu2'),flow.max('τb1'),flow.max('τb2'),flow.max('τp')])
             logger.info('Iteration={:d}, Time={:.3e} ({:.1e}), dt={:.1e}, PE={:.3e}, KE={:.3e}, Re={:.2g}, Nu={:.2g}, τ={:.2e}'. format(solver.iteration, solver.sim_time, solver.sim_time/t_diffusion, Δt, avg_PE, avg_KE, avg_Re, avg_Nu, max_τ))
             good_solution = np.isfinite(max_Re)
