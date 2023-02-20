@@ -175,7 +175,7 @@ flux_κ = -kappa*grad(b+b0)@ez
 # Analysis
 snapshots = solver.evaluator.add_file_handler(data_dir+'/snapshots', sim_dt=0.1, max_writes=10)
 snapshots.add_task(b+b0, name='b')
-snapshots.add_task(ω, name='vorticity')
+snapshots.add_task(ey@ω, name='vorticity')
 snapshots.add_task(ω@ω, name='enstrophy')
 snapshots.add_task((b+b0)(z=Lz/2), layout='c', name='b midplane c')
 snapshots.add_task((u)(z=Lz/2), layout='c', name='u reg midplane c')
