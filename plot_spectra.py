@@ -16,9 +16,6 @@ import pathlib
 import h5py
 import time
 
-# needed for logging to work
-import dedalus.public as de
-
 import logging
 logger = logging.getLogger(__name__.split('.')[-1])
 matplotlib_logger = logging.getLogger('matplotlib')
@@ -37,38 +34,36 @@ else:
 
 u_tot_tag = r'$u_\mathrm{tot}$'
 u_perp_tag = r'$u_\perp$'
-w_tag = '$w$'
-T_tag = '$T$'
-pow = {u_perp_tag: 0, w_tag:0, u_tot_tag:0, T_tag:0}
+w_tag = r'$u_z$'
+b_tag = r'$b$'
+pow = {u_perp_tag: 0, w_tag:0, u_tot_tag:0, b_tag:0}
 n_t = 0
 first_time = None
 
+tasks = ['b midplane c', 'u_x midplane c', 'u_z midplane c', 'ω_y midplane c']
+
 for file in files:
     logger.info('opening {:s}'.format(file))
-    f = h5py.File(file, 'r')
-    data = {}
-    t = f['scales/sim_time'][:]
-    kx = f['scales/kx'][:]
-    ky = f['scales/ky'][:]
-    x = f['scales/x/1.0'][:]
-    y = f['scales/y/1.0'][:]
-    for key in f['tasks']:
-        data[key] = f['tasks/'+key][:,:,:,0]
-    f.close()
+    with h5py.File(file, mode='r') as f:
+        t = np.array(f['scales/sim_time'])
+        data = {}
+        for i, task in enumerate(tasks):
+            data[task] = f['tasks'][task][:]
+            kx = f['tasks'][task].dims[1]['kx'][:]
+
     if not first_time:
         first_time = t[0]
 
-    n_t += t.shape[0]
+    n_t = t.shape[0]
     for i in range(t.shape[0]):
-        u_c = data['u midplane c'][i,:,:]
-        v_c = data['v midplane c'][i,:,:]
-        w_c = data['w midplane c'][i,:,:]
-        T_c = data['T midplane c'][i,:,:]
-
-        pow[u_perp_tag] += np.abs(u_c*np.conj(u_c)+v_c*np.conj(v_c))
+        u_c = data['u_x midplane c'][i,:,:]
+        v_c = 0
+        w_c = data['u_z midplane c'][i,:,:]
+        b_c = data['b midplane c'][i,:,:]
+        pow[u_perp_tag] += np.abs(u_c*np.conj(u_c) + v_c*np.conj(v_c))
         pow[w_tag] += np.abs(w_c*np.conj(w_c))
         pow[u_tot_tag] += np.abs(u_c*np.conj(u_c)+v_c*np.conj(v_c)+w_c*np.conj(w_c))
-        pow[T_tag] += np.abs(T_c*np.conj(T_c))
+        pow[b_tag] += np.abs(b_c*np.conj(b_c))
 
 last_time = t[-1]
 
@@ -76,108 +71,23 @@ for q in pow:
     pow[q] /= n_t
 
 logger.info("power spectra accumulated from t={:.3g}--{:.3g} ({:.3g} total)".format(first_time, last_time, last_time-first_time))
-n_ky = ky.shape[0]
-
-ky_shift = int((n_ky+1)/2)
-for q in pow:
-    pow[q] = np.roll(pow[q],-ky_shift,axis=1)
-ky = np.roll(ky,  -ky_shift,axis=0)
-
-kx_g, ky_g = np.meshgrid(kx, ky, indexing='ij')
-logger.info("kx {}, ky {}".format(kx.shape, ky.shape))
-logger.info("kx_g {}, ky_g {}".format(kx_g.shape, ky_g.shape))
-logger.info("pow {}".format(pow[u_tot_tag].shape))
 n_kx = kx.shape[0]
-n_theta = 2*n_kx
-n_kr = n_kx
 
-theta = np.arctan2(ky_g, kx_g)
-kr = np.sqrt(kx_g*kx_g+ky_g*ky_g)
-
-theta_u = np.linspace(-np.pi/2, np.pi/2, n_theta)
-kr_u = np.linspace(0, np.max(kx), n_kr)
-
-fig_grid, ax_grid = plt.subplots(ncols=2, nrows=2, figsize=[6,6])
-ax_grid[0,0].pcolormesh(kx_g, ky_g, kx_g, shading='flat')
-ax_grid[0,1].pcolormesh(kx_g, ky_g, ky_g, shading='flat')
-ax_grid[1,0].pcolormesh(kx_g, ky_g, theta, shading='flat')
-ax_grid[1,1].pcolormesh(kx_g, ky_g, kr, shading='flat')
-fig_grid.savefig('{:s}/grids.png'.format(str(output_path)), dpi=300)
-
-original_coords_flat = (theta.flatten(), kr.flatten())
-kr_u_g, theta_u_g = np.meshgrid(kr_u, theta_u)
-
-from scipy.interpolate import griddata
-
-start_int = time.time()
-pow_u ={}
-for tag in pow:
-    pow_u[tag] = griddata(original_coords_flat, pow[tag].flatten(), (theta_u_g, kr_u_g))
-    logger.info(pow_u[tag].shape)
-end_int = time.time()
-print("Interpolation took {:g} seconds".format(end_int-start_int))
-print(theta_u_g.shape, kr_u_g.shape)
-
-u = data['u midplane'][-1,:,:]
-v = data['v midplane'][-1,:,:]
-w = data['w midplane'][-1,:,:]
-T = data['T midplane'][-1,:,:]
-x_g, y_g = np.meshgrid(x, y)
-kx_g, ky_g = np.meshgrid(kx, ky)
-
-fig_spectra, ax_spectra = plt.subplots(ncols=2, nrows=1, figsize=[6,3], subplot_kw=dict(polar=True))
-ax_spectra[0].pcolormesh(theta_u_g, kr_u_g, np.log(pow_u[u_tot_tag]), shading='flat')
-ax_spectra[1].pcolormesh(theta_u_g, kr_u_g, np.log(pow_u[T_tag]), shading='flat')
-for ax in ax_spectra:
-    ax.set_aspect(1)
-    ax.set_thetalim(np.pi/2,-np.pi/2)
-    ax.set_theta_offset(0)
-    ax.set_xticks(np.linspace(-np.pi/2,np.pi/2, num=7))
-fig_spectra.savefig('{:s}/power_spectrum_2d_kr.png'.format(str(output_path)), dpi=300)
-
-arrow=(slice(None,None,8),slice(None,None,8))
-
-fig_spectra2d, ax_spectra2d = plt.subplots(ncols=2, nrows=2, figsize=[6,6])
-
-ax_spectra2d[0,0].pcolormesh(kx_g, ky_g, np.log(pow[u_tot_tag]).T, shading='flat')
-ax_spectra2d[0,0].set_xlabel(r'$k_x$')
-ax_spectra2d[0,0].set_ylabel(r'$k_y$')
-ax_spectra2d[0,0].set_title(u_tot_tag)
-ax_spectra2d[0,1].pcolormesh(x_g, y_g, w.T, shading='flat')
-ax_spectra2d[0,1].quiver(x_g[arrow], y_g[arrow], u[arrow].T, v[arrow].T, units='xy', scale=0.9)
-ax_spectra2d[0,1].yaxis.tick_right()
-ax_spectra2d[0,1].set_title('t={:.3g}'.format(t[-1]))
-ax_spectra2d[0,1].set_xlabel(r'$x$')
-ax_spectra2d[0,1].set_ylabel(r'$y$')
-# ax_spectra2d[2].pcolormesh(theta_u, kr_u, np.log(pow_u).T, shading='flat', polar=True)
-# ax_spectra2d[2].set_rticks([])
-# ax_spectra2d[2].set_aspect(1)
-
-ax_spectra2d[1,0].pcolormesh(kx_g, ky_g, np.log(pow[T_tag]).T, shading='flat')
-ax_spectra2d[1,0].set_xlabel(r'$k_x$')
-ax_spectra2d[1,0].set_ylabel(r'$k_y$')
-ax_spectra2d[1,0].set_title(T_tag)
-ax_spectra2d[1,1].pcolormesh(x_g, y_g, T.T, shading='flat', cmap='RdYlBu')
-ax_spectra2d[1,1].yaxis.tick_right()
-ax_spectra2d[1,1].set_xlabel(r'$x$')
-ax_spectra2d[1,1].set_ylabel(r'$y$')
-
-
-fig_spectra2d.savefig('{:s}/power_spectrum_2d.png'.format(str(output_path)), dpi=300)
-
+# kx_shift = int((n_kx+1)/2)
+# for q in pow:
+#     pow[q] = np.roll(pow[q],-kx_shift,axis=1)
+# kx = np.roll(kx,  -kx_shift,axis=0)
+kx = kx[:,0,0]
 fig_spectra, ax_spectra = plt.subplots()
 for q in pow:
-    print(pow_u[q].shape)
-    avg_spectra = np.nanmean(pow_u[q], axis=0)
-    ax_spectra.plot(kr_u, avg_spectra, label=q)
+    ax_spectra.plot(kx, pow[q][:,0,0], label=q)
 min_y, max_y = ax_spectra.get_ylim()
-ax_spectra.set_ylim(max_y*1e-8,max_y)
+#ax_spectra.set_ylim(max_y*1e-8,max_y)
 
-print(np.nanmean(pow_u[u_tot_tag], axis=0))
-norm = np.nanmax(np.nanmean(pow_u[u_tot_tag], axis=0))
+norm = np.nanmax(np.nanmean(pow[u_tot_tag], axis=0))
 
 logger.info('powerlaw k^(-5/3) norm is {:.3g}'.format(norm))
-ax_spectra.plot(kx, norm*kx**(-5/3), color='black', linestyle='dashed', label=r'$k_\perp^{-5/3}$')
+#ax_spectra.plot(kx, norm*kx**(-5/3), color='black', linestyle='dashed', label=r'$k_\perp^{-5/3}$')
 
 ax_spectra.legend()
 ax_spectra.set_ylabel(r'Horizontal power spectrum ($u_\perp*u_\perp$)')
