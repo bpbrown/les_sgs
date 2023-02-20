@@ -16,6 +16,7 @@ import pathlib
 import h5py
 import time
 
+import dedalus.public as de
 import logging
 logger = logging.getLogger(__name__.split('.')[-1])
 matplotlib_logger = logging.getLogger('matplotlib')
@@ -36,7 +37,8 @@ u_tot_tag = r'$u_\mathrm{tot}$'
 u_perp_tag = r'$u_\perp$'
 w_tag = r'$u_z$'
 b_tag = r'$b$'
-pow = {u_perp_tag: 0, w_tag:0, u_tot_tag:0, b_tag:0}
+ω_tag = r'$\omega_y$'
+pow = {u_perp_tag: 0, w_tag:0, u_tot_tag:0, b_tag:0, ω_tag:0}
 n_t = 0
 first_time = None
 
@@ -54,16 +56,18 @@ for file in files:
     if not first_time:
         first_time = t[0]
 
-    n_t = t.shape[0]
+    n_t += t.shape[0]
     for i in range(t.shape[0]):
         u_c = data['u_x midplane c'][i,:,:]
         v_c = 0
         w_c = data['u_z midplane c'][i,:,:]
         b_c = data['b midplane c'][i,:,:]
+        ω_c = data['ω_y midplane c'][i,:,:]
         pow[u_perp_tag] += np.abs(u_c*np.conj(u_c) + v_c*np.conj(v_c))
         pow[w_tag] += np.abs(w_c*np.conj(w_c))
         pow[u_tot_tag] += np.abs(u_c*np.conj(u_c)+v_c*np.conj(v_c)+w_c*np.conj(w_c))
         pow[b_tag] += np.abs(b_c*np.conj(b_c))
+        pow[ω_tag] += np.abs(ω_c*np.conj(ω_c))
 
 last_time = t[-1]
 
@@ -73,16 +77,12 @@ for q in pow:
 logger.info("power spectra accumulated from t={:.3g}--{:.3g} ({:.3g} total)".format(first_time, last_time, last_time-first_time))
 n_kx = kx.shape[0]
 
-# kx_shift = int((n_kx+1)/2)
-# for q in pow:
-#     pow[q] = np.roll(pow[q],-kx_shift,axis=1)
-# kx = np.roll(kx,  -kx_shift,axis=0)
 kx = kx[:,0,0]
 fig_spectra, ax_spectra = plt.subplots()
 for q in pow:
     ax_spectra.plot(kx, pow[q][:,0,0], label=q)
 min_y, max_y = ax_spectra.get_ylim()
-#ax_spectra.set_ylim(max_y*1e-8,max_y)
+ax_spectra.set_ylim(max_y*1e-20,max_y)
 
 norm = np.nanmax(np.nanmean(pow[u_tot_tag], axis=0))
 
@@ -95,3 +95,4 @@ ax_spectra.set_xlabel(r'$k_\perp$')
 ax_spectra.set_yscale('log')
 ax_spectra.set_xscale('log')
 fig_spectra.savefig('{:s}/power_spectrum.pdf'.format(str(output_path)))
+fig_spectra.savefig('{:s}/power_spectrum.png'.format(str(output_path)), dpi=300)
